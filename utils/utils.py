@@ -5,47 +5,38 @@ Created on Fri Nov 13 12:11:26 2020
 
 @author: janbinkowski
 """
-import os
 import sys
-import subprocess
-from datetime import datetime
-
 import click
 
-def gunzip_(path: str):
-    querry = ["gzip", "-d", "-k", path]
-    subprocess.run(querry, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-def check_directory_(path: str) -> bool:
-    dir_list = os.listdir(path)
-    if not dir_list:
-        return False
-    else:
-        return True
     
-def update_read_path_(path: str) -> str:
-    return path[:-2]
-    
-def print_(msg: str, bold=False) -> None:
-    click.echo(click.style(msg), bold=bold)
+def print_(msg: str, bold=False, blink=False, is_command=False) -> None:
+    if is_command:
+        msg = " ".join(map(lambda char: str(char), msg))
+        msg = "Running: " + msg
+    click.echo(click.style(f"{msg}\n", bold=bold, blink=blink))
     
 def clear_() -> None:
     click.clear()
     
-def break_() -> None:
+def break_(msg: str) -> None:
+    print_(msg, blink=True)
     sys.exit(1)
 
-def create_results_dir_(project_name: dir) -> tuple:
-    path = os.path.join("Results/", f"{project_name}")
-    
-    final_path = os.path.join(path, "Final")
-    raw_path = os.path.join(path, "Raw")
-    
-    try:
-        os.makedirs(raw_path)
-        os.makedirs(final_path)
-    except FileExistsError:
-        pass
-    
-    return raw_path, final_path
-    
+def save_raw_file(data: str, path: str) -> None:
+    with open(f"{path}/bam_stats.txt", "wb") as handle:
+        handle.write(data)
+
+def help_(ctx, param, value):
+    if not value or not param:
+        return
+    click.echo(ctx.get_help())
+    ctx.exit()
+
+
+def check_flags_(ctx, read_1, read_2, reference, reference_genome, output, project_name):
+    if not read_1 or not read_1 or not reference or not reference_genome or not project_name:
+        arguments = locals().items()
+        missing_args = [flag for flag, value in arguments if value is None]
+        missing_args = " | ".join(missing_args)
+        click.echo(click.style(f"Missing option/s: {missing_args}, use --help / -h to print options.", bold=True))
+        ctx.exit()
