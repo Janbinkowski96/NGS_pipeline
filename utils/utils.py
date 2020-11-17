@@ -33,8 +33,8 @@ def help_(ctx, param, value):
     ctx.exit()
 
 
-def check_flags_(ctx, read_1, read_2, reference, reference_genome, output, project_name):
-    if not read_1 or not read_1 or not reference or not reference_genome or not project_name:
+def check_flags_(ctx, read_1, read_2, reference, reference_genome, regions, output, project_name):
+    if not read_1 or not read_1 or not reference or not reference_genome  or not regions or not project_name:
         arguments = locals().items()
         missing_args = [flag for flag, value in arguments if value is None]
         missing_args = " | ".join(missing_args)

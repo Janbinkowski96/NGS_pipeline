@@ -24,7 +24,9 @@ class Shell:
     
     def reset_cwd(self) -> None:
         self.cwd = self.main_dir
-        
+    
+
     def run(self, command: list) -> str:
         process = sub.run(command, cwd=self.cwd, stdout=sub.PIPE)
         return process.stdout
+    

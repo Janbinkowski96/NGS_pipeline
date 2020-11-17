@@ -18,11 +18,12 @@ from utils.utils import break_, clear_, print_, help_, check_flags_
 @click.option('--read-2', '-2', type=click.Path(exists=True), help='Read 2 path.')
 @click.option('--reference', '-r', type=click.Path(), help='Reference genome index.')
 @click.option('--reference-genome', '-g', type=click.Path(), help='Reference genome for VC.')
+@click.option('--regions', '-s', type=click.Path(), help='Path to BED file with specyfic regions.')
 @click.option('--output', '-o', type=click.Path(), help='Output path')
 @click.option('--project-name', '-p', type=str, help='Project name.')
 @click.pass_context
-def main(ctx, read_1, read_2, reference, reference_genome, output, project_name):
-    check_flags_(ctx, read_1, read_2, reference, reference_genome, output, project_name)
+def main(ctx, read_1, read_2, reference, reference_genome, regions, output, project_name):
+    check_flags_(ctx, read_1, read_2, reference, reference_genome, regions, output, project_name)
     clear_()
     
     main_directory = FileMenager.join_paths(output, project_name)
@@ -53,7 +54,6 @@ def main(ctx, read_1, read_2, reference, reference_genome, output, project_name)
     shell.set_path("alignment")
     
     # Run Hisat2
-    
     command = shell.prepare_command_(f"""hisat2 -x {reference}/ -q 
                                      -1 {read_1} -2 {read_2} 
                                      --summary-file alignment_raport.txt -p 10
@@ -64,17 +64,17 @@ def main(ctx, read_1, read_2, reference, reference_genome, output, project_name)
     shell.run(command)
 
     # Convert SAM to BAM
-    command = shell.prepare_command_(f"""samtools view raw_alignment.sam -b -S -o raw_alignment.bam""")
+    command = shell.prepare_command_(f"""samtools view raw_alignment.sam -L {regions} -b -S -o raw_alignment.bam""")
     print_(command, bold=True, is_command=True)
     shell.run(command)
 
     # Samtools fixmate
-    command = shell.prepare_command_(f"samtools fixmate -m raw_alignment.bam fixmate_alignment.bam")
+    command = shell.prepare_command_("samtools fixmate -m raw_alignment.bam fixmate_alignment.bam")
     print_(command, bold=True, is_command=True)
     shell.run(command)
 
     # Samtools sort
-    command = shell.prepare_command_(f"samtools sort -o sorted_alignment.bam -O BAM fixmate_alignment.bam")
+    command = shell.prepare_command_("samtools sort -o sorted_alignment.bam -O BAM fixmate_alignment.bam")
     print_(command, bold=True, is_command=True)
     shell.run(command)
     
@@ -109,7 +109,7 @@ def main(ctx, read_1, read_2, reference, reference_genome, output, project_name)
     shell.run(command)
     
     # Coverage
-    command = shell.prepare_command_(f"samtools coverage -m -A ../alignment/{project_name}_final.bam -o coverage.bed")
+    command = shell.prepare_command_(f"samtools coverage ../alignment/{project_name}_final.bam -o coverage.bed")
     print_(command, bold=True, is_command=True)
     shell.run(command)
     
