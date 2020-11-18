@@ -56,7 +56,7 @@ def main(ctx, read_1, read_2, reference, reference_genome, regions, output, proj
     # Run Hisat2
     command = shell.prepare_command_(f"""hisat2 -x {reference}/ -q 
                                      -1 {read_1} -2 {read_2} 
-                                     --summary-file alignment_raport.txt -p 10
+                                     --summary-file alignment_raport.txt -p 4
                                      --no-spliced-alignment 
                                      -S raw_alignment.sam""")
     print_(command, bold=True, is_command=True)
@@ -65,6 +65,11 @@ def main(ctx, read_1, read_2, reference, reference_genome, regions, output, proj
 
     # Convert SAM to BAM
     command = shell.prepare_command_(f"""samtools view raw_alignment.sam -L {regions} -b -S -o raw_alignment.bam""")
+    print_(command, bold=True, is_command=True)
+    shell.run(command)
+    
+    # Delete SAM file
+    command = shell.prepare_command_("rm raw_alignment.sam")
     print_(command, bold=True, is_command=True)
     shell.run(command)
 
@@ -87,13 +92,12 @@ def main(ctx, read_1, read_2, reference, reference_genome, regions, output, proj
     command = shell.prepare_command_(f"samtools flagstats -O tsv {project_name}_final.bam")
     print_(command, bold=True, is_command=True)
     stats = shell.run(command)
-    save_raw_file(stats, shell.cwd)
+    save_raw_file(stats, shell.cwd, "final_BAM_stats")
     
     # BAM file indexing
     command = shell.prepare_command_(f"samtools index -b  {project_name}_final.bam")
     print_(command, bold=True, is_command=True)
     shell.run(command)
-    
     
     # Coverage & depth
     # Create new directory for important BAM stats
@@ -102,16 +106,11 @@ def main(ctx, read_1, read_2, reference, reference_genome, regions, output, proj
     shell.reset_cwd()
     shell.set_path(bam_stats_directory)
 
-    # Coverage & Depth
-    # Depth
-    command = shell.prepare_command_(f"samtools depth ../alignment/{project_name}_final.bam -o depth.txt")
-    print_(command, bold=True, is_command=True)
-    shell.run(command)
-    
     # Coverage
-    command = shell.prepare_command_(f"samtools coverage ../alignment/{project_name}_final.bam -o coverage.bed")
+    command = shell.prepare_command_(f"bedtools coverage -b ../alignment/{project_name}_final.bam -a {regions}")
     print_(command, bold=True, is_command=True)
-    shell.run(command)
+    depth_stats = shell.run(command)
+    save_raw_file(depth_stats, shell.cwd, "coverage")
     
     # Variant Calling
     # Create new directory for Variant Calling data
@@ -132,7 +131,6 @@ def main(ctx, read_1, read_2, reference, reference_genome, regions, output, proj
     command = shell.prepare_command_("bcftools call -O v -m -v --ploidy GRCh37 raw.vcf -o variants.vcf")
     print_(command, bold=True, is_command=True)
     shell.run(command)
-    
 
 if __name__ == "__main__":
     main()

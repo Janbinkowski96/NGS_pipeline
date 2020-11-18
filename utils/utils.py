@@ -22,8 +22,8 @@ def break_(msg: str) -> None:
     print_(msg, blink=True)
     sys.exit(1)
 
-def save_raw_file(data: str, path: str) -> None:
-    with open(f"{path}/bam_stats.txt", "wb") as handle:
+def save_raw_file(data: str, path: str, file_name: str) -> None:
+    with open(f"{path}/{file_name}.txt", "wb") as handle:
         handle.write(data)
 
 def help_(ctx, param, value):
