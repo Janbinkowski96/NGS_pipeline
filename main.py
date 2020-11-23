@@ -128,7 +128,7 @@ def main(ctx, read_1, read_2, reference, reference_genome, regions, output, proj
     shell.run(command)
     
     # Calling
-    command = shell.prepare_command_("bcftools call -O v -m -v --ploidy GRCh37 raw.vcf -o variants.vcf")
+    command = shell.prepare_command_("bcftools call -f GQ -O v -m -v --ploidy GRCh37 raw.vcf -o variants.vcf")
     print_(command, bold=True, is_command=True)
     shell.run(command)
 
