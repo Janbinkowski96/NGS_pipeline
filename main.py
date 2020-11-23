@@ -16,14 +16,15 @@ from utils.utils import break_, clear_, print_, help_, check_flags_
 
 @click.option('--read-1', '-1', type=click.Path(exists=True), help='Read 1 path.')
 @click.option('--read-2', '-2', type=click.Path(exists=True), help='Read 2 path.')
-@click.option('--reference', '-r', type=click.Path(), help='Reference genome index.')
+@click.option('--index', '-i', type=click.Path(), help='Reference genome index.')
 @click.option('--reference-genome', '-g', type=click.Path(), help='Reference genome for VC.')
 @click.option('--regions', '-s', type=click.Path(), help='Path to BED file with specyfic regions.')
+@click.option('--algorithm', '-a', type=click.Choice(["hisa2", "bowtie2"]), help='Alignment algorithm.')
 @click.option('--output', '-o', type=click.Path(), help='Output path')
 @click.option('--project-name', '-p', type=str, help='Project name.')
 @click.pass_context
-def main(ctx, read_1, read_2, reference, reference_genome, regions, output, project_name):
-    check_flags_(ctx, read_1, read_2, reference, reference_genome, regions, output, project_name)
+def main(ctx, read_1, read_2, index, reference_genome, regions, algorithm, output, project_name):
+    check_flags_(ctx, read_1, read_2, index, reference_genome, regions, algorithm, output, project_name)
     clear_()
     
     main_directory = FileMenager.join_paths(output, project_name)
@@ -49,16 +50,23 @@ def main(ctx, read_1, read_2, reference, reference_genome, regions, output, proj
     shell.reset_cwd()
     
     # Create aligment dir
-    hisat_files = file_menager.join_paths(main_directory, "alignment")
-    file_menager.create_directory(hisat_files)
+    alignment_dir = file_menager.join_paths(main_directory, "alignment")
+    file_menager.create_directory(alignment_dir)
     shell.set_path("alignment")
     
     # Run Hisat2
-    command = shell.prepare_command_(f"""hisat2 -x {reference}/ -q 
-                                     -1 {read_1} -2 {read_2} 
-                                     --summary-file alignment_raport.txt -p 4
-                                     --no-spliced-alignment 
-                                     -S raw_alignment.sam""")
+    if algorithm == "hisat2":
+        command = shell.prepare_command_(f"""hisat2 -x {index}/ -q 
+                                         -1 {read_1} -2 {read_2} 
+                                         --summary-file alignment_raport.txt -p 4
+                                         --no-spliced-alignment 
+                                         -S raw_alignment.sam""")
+    if algorithm == "bowtie2":
+        command = shell.prepare_command_(f"""bowtie2 -x {index}/ -1 {read_1}
+                                         -2 {read_2} --phred33 --sensitive 
+                                         -p 4 -S raw_alignment.sam
+                                         """)
+                                         
     print_(command, bold=True, is_command=True)
     print_(str(command).join(""))
     shell.run(command)
