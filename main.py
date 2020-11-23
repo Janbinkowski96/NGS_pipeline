@@ -142,10 +142,10 @@ def main(ctx, read_1, read_2, index, reference_genome, regions, algorithm, outpu
     
     # Annotations
     command = shell.prepare_command_(f"""
-                                     vep -i variants.vcf -o _vep.vcf --cache 
+                                     vep -i variants.vcf -o variants_annotated.json --cache 
                                      -port 3337 -force_overwrite 
                                      --check_existing --symbol -vcf -biotype 
-                                     --merged --sift b --everything 
+                                     --merged --sift b --everything --json
                                      -fields Uploaded_variation, Location, Allele, 
                                      VARIANT_CLASS,BIOTYPE, Consequence, 
                                      Existing_variation, CLIN_SIG,SYMBOL, 
