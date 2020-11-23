@@ -139,6 +139,27 @@ def main(ctx, read_1, read_2, index, reference_genome, regions, algorithm, outpu
     command = shell.prepare_command_("bcftools call -f GQ -O v -m -v --ploidy GRCh37 raw.vcf -o variants.vcf")
     print_(command, bold=True, is_command=True)
     shell.run(command)
-
+    
+    # Annotations
+    command = shell.prepare_command_(f"""
+                                     vep -i variants.vcf -o _vep.vcf --cache 
+                                     -port 3337 -force_overwrite 
+                                     --check_existing --symbol -vcf -biotype 
+                                     --merged --sift b --everything 
+                                     -fields Uploaded_variation, Location, Allele, 
+                                     VARIANT_CLASS,BIOTYPE, Consequence, 
+                                     Existing_variation, CLIN_SIG,SYMBOL, 
+                                     SYMBOL_SOURCE, Gene, Feature_type, Feature, 
+                                     cDNA_position, CDS_position, Protein_position, Amino_acids, 
+                                     Codons, IMPACT, DISTANCE, EXON, INTRON, 
+                                     DOMAINS, SIFT, PolyPhen, MAX_AF, MAX_AF_POPS,
+                                     AF, AFR_AF, AMR_AF, EAS_AF, EUR_AF, SAS_AF, 
+                                     AA_AF, EA_AF, gnomAD_AF, gnomAD_AFR_AF, gnomAD_AMR_AF, 
+                                     gnomAD_ASJ_AF, gnomAD_EAS_AF, gnomAD_FIN_AF, 
+                                     gnomAD_NFE_AF, gnomAD_OTH_AF, gnomAD_SAS_AF
+                                     """)
+    print_(command, bold=True, is_command=True)
+    shell.run(command)
+    
 if __name__ == "__main__":
     main()
