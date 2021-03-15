@@ -6,6 +6,8 @@ from source.file_menager import FileMenager
 from utils.utils import save_raw_file
 from utils.utils import break_, clear_, print_, help_, check_flags_
 
+from source.config import *
+
 @click.command()
 @click.option('--help', '-h',
               is_flag=True,
@@ -19,7 +21,7 @@ from utils.utils import break_, clear_, print_, help_, check_flags_
 @click.option('--index', '-i', type=click.Path(), help='Reference genome index.')
 @click.option('--reference-genome', '-g', type=click.Path(), help='Reference genome for VC.')
 @click.option('--regions', '-s', type=click.Path(), help='Path to BED file with specyfic regions.')
-@click.option('--algorithm', '-a', type=click.Choice(["hisa2", "bowtie2"]), help='Alignment algorithm.')
+@click.option('--algorithm', '-a', type=click.Choice(["hisa2", "bowtie2", "bwa"]), help='Alignment algorithm.')
 @click.option('--output', '-o', type=click.Path(), help='Output path')
 @click.option('--project-name', '-p', type=str, help='Project name.')
 @click.pass_context
@@ -44,27 +46,31 @@ def main(ctx, read_1, read_2, index, reference_genome, regions, algorithm, outpu
     shell.set_path("QC")
     
     # QC
-    command = shell.prepare_command_(f"fastp --in1 {read_1} --in2 {read_2}")
+    command = shell.prepare_command_(f"fastp -w {THREADS_NUMBER} --in1 {read_1} --in2 {read_2} -o read_1.fastq -O read_2.fastq")
     print_(command, bold=True, is_command=True)
     shell.run(command)
     shell.reset_cwd()
-    
+
     # Create aligment dir
     alignment_dir = file_menager.join_paths(main_directory, "alignment")
     file_menager.create_directory(alignment_dir)
     shell.set_path("alignment")
     
-    # Run Hisat2
+    # Run Mapper
     if algorithm == "hisat2":
         command = shell.prepare_command_(f"""hisat2 -x {index}/ -q 
-                                         -1 {read_1} -2 {read_2} 
-                                         --summary-file alignment_raport.txt -p 4
+                                         -1 ../QC/read_1.fastq -2  ../QC/read_2.fastq
+                                         --summary-file alignment_raport.txt -p {THREADS_NUMBER}
                                          --no-spliced-alignment 
                                          -S raw_alignment.sam""")
-    if algorithm == "bowtie2":
-        command = shell.prepare_command_(f"""bowtie2 -x {index}/ -1 {read_1}
-                                         -2 {read_2} --phred33 --sensitive 
-                                         -p 4 -S raw_alignment.sam
+    elif algorithm == "bowtie2":
+        command = shell.prepare_command_(f"""bowtie2 -x {index}/ -1 ../QC/read_1.fastq
+                                         -2 ../QC/read_2.fastq --phred33 --sensitive 
+                                         -p {THREADS_NUMBER} -S raw_alignment.sam
+                                         """)
+    else:
+    	command = shell.prepare_command_(f"""bwa mem -M -t {THREADS_NUMBER} -Y -o raw_alignment.sam {index}  
+    					  ../QC/read_1.fastq ../QC/read_2.fastq
                                          """)
                                          
     print_(command, bold=True, is_command=True)
@@ -72,7 +78,7 @@ def main(ctx, read_1, read_2, index, reference_genome, regions, algorithm, outpu
     shell.run(command)
 
     # Convert SAM to BAM
-    command = shell.prepare_command_(f"""samtools view raw_alignment.sam -L {regions} -b -S -o raw_alignment.bam""")
+    command = shell.prepare_command_(f"""samtools view raw_alignment.sam -L {regions} -b -S -@ {THREADS_NUMBER} -o raw_alignment.bam""")
     print_(command, bold=True, is_command=True)
     shell.run(command)
     
@@ -82,12 +88,12 @@ def main(ctx, read_1, read_2, index, reference_genome, regions, algorithm, outpu
     shell.run(command)
 
     # Samtools fixmate
-    command = shell.prepare_command_("samtools fixmate -m raw_alignment.bam fixmate_alignment.bam")
+    command = shell.prepare_command_("samtools fixmate -m raw_alignment.bam fixmate_alignment.bam -@ {THREADS_NUMBER}")
     print_(command, bold=True, is_command=True)
     shell.run(command)
 
     # Samtools sort
-    command = shell.prepare_command_("samtools sort -o sorted_alignment.bam -O BAM fixmate_alignment.bam")
+    command = shell.prepare_command_("samtools sort -@ {THREADS_NUMBER} -o sorted_alignment.bam -O BAM fixmate_alignment.bam")
     print_(command, bold=True, is_command=True)
     shell.run(command)
     
@@ -112,10 +118,10 @@ def main(ctx, read_1, read_2, index, reference_genome, regions, algorithm, outpu
     bam_stats_directory = FileMenager.join_paths(main_directory, "depth_coverage_stats")
     FileMenager.create_directory(path=bam_stats_directory)
     shell.reset_cwd()
-    shell.set_path(bam_stats_directory)
+    shell.set_path("depth_coverage_stats")
 
     # Coverage
-    command = shell.prepare_command_(f"bedtools coverage -b ../alignment/{project_name}_final.bam -a {regions}")
+    command = shell.prepare_command_(f"bedtools coverage -a {regions} -b ../alignment/{project_name}_final.bam")
     print_(command, bold=True, is_command=True)
     depth_stats = shell.run(command)
     save_raw_file(depth_stats, shell.cwd, "coverage")
@@ -125,18 +131,36 @@ def main(ctx, read_1, read_2, index, reference_genome, regions, algorithm, outpu
     vc_directory = FileMenager.join_paths(main_directory, "VC")
     FileMenager.create_directory(path=vc_directory)
     shell.reset_cwd()
-    shell.set_path(vc_directory)
+    shell.set_path("VC")
     
     # Mpileup
-    command = shell.prepare_command_(f"""bcftools mpileup -E -a DP -a SP -a AD -P ILLUMINA -pm3 -F0.2 -C50 -d 1400000
+    command = shell.prepare_command_(f"""bcftools mpileup -a DP,SP,AD,ADF,ADR  -d 100 -p -m 2 -F 0.2 -A -C 50
                                      -f {reference_genome}
-                                     -o raw.vcf -O v
+                                     -o raw.vcf -O v --threads {THREADS_NUMBER}
                                      ../alignment/{project_name}_final.bam""")
+                                     
     print_(command, bold=True, is_command=True)
     shell.run(command)
     
     # Calling
-    command = shell.prepare_command_("bcftools call -f GQ -O v -m -v --ploidy GRCh37 raw.vcf -o variants.vcf")
+    command = shell.prepare_command_("bcftools call -cv --threads {THREADS_NUMBER} --ploidy GRCh37 -p 0.09 -Ov -o variants.vcf raw.vcf")
+    print_(command, bold=True, is_command=True)
+    shell.run(command)
+    
+    
+    # GZIP and Index VCF
+    command = shell.prepare_command_("bgzip variants.vcf")
+    print_(command, bold=True, is_command=True)
+    shell.run(command)
+    
+    command = shell.prepare_command_("bcftools index -t variants.vcf.gz")
+    print_(command, bold=True, is_command=True)
+    shell.run(command)
+    
+    # Normalization
+    command = shell.prepare_command_(f"""bcftools norm variants.vcf.gz -Ov --check-ref w -f {reference_genome} 
+    					  -R {regions} -o final.vcf""")
+    
     print_(command, bold=True, is_command=True)
     shell.run(command)
     
@@ -158,8 +182,8 @@ def main(ctx, read_1, read_2, index, reference_genome, regions, algorithm, outpu
                                      gnomAD_ASJ_AF, gnomAD_EAS_AF, gnomAD_FIN_AF, 
                                      gnomAD_NFE_AF, gnomAD_OTH_AF, gnomAD_SAS_AF
                                      """)
-    print_(command, bold=True, is_command=True)
-    shell.run(command)
+    #print_(command, bold=True, is_command=True)
+    #shell.run(command)
     
 if __name__ == "__main__":
     main()
